@@ -1,0 +1,16 @@
+<div ng-controller="preserver.notification.controller as vm">
+
+    <h4>
+        <localize key="preserver_foundContentHeading"></localize>
+    </h4>
+    <p>
+        <localize key="preserver_foundContent"></localize>
+    </p>
+
+    <button class="btn btn-default" ng-click="vm.discard(notification)">
+        <localize key="general_close"></localize>
+    </button>
+    <button class="btn btn-success" ng-click="vm.update(notification)">
+        <localize key="general_ok"></localize>
+    </button>   
+</div>

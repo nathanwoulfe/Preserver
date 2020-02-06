@@ -1,0 +1,18 @@
+﻿{  
+    propertyEditors: [      
+        {
+            alias: "preserver",
+            name: "Preserver",
+            editor: {
+                view: "~/app_plugins/preserver/backoffice/editor.html",
+                valueType: "INT"
+            }
+        }        
+    ],
+    css: [
+        '~/app_plugins/preserver/backoffice/styles.css'
+    ],
+    javascript: [	
+          '~/app_plugins/preserver/backoffice/preserver.min.js'
+    ]
+}
