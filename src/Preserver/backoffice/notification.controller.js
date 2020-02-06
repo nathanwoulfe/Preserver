@@ -13,4 +13,4 @@
     // register controller 
     angular.module('preserver').controller('preserver.notification.controller', ['$rootScope', 'notificationsService', 'editorState', notificationController]);
 })();
- 
+  

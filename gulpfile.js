@@ -11,6 +11,7 @@ const urls = {
     js: 'src/**/*.js',
     html: 'src/**/*.html',
     css: 'src/**/*.css',
+    lang: 'src/**/*.xml',
     devManifest: 'src/**/package.dev.manifest',
     prodManifest: 'src/**/package.prod.manifest',
     dist: 'dist/',
@@ -29,26 +30,31 @@ gulp.task('clean', () =>
 
 gulp.task('js', () =>
     gulp.src(urls.js)
-        .pipe(config.prod ? babel() : util.noop())
-        .pipe(config.prod ? concat('preserver.min.js') : util.noop())
-        .pipe(config.prod ? uglify() : util.noop())
-        .pipe(gulp.dest(urls.dest + (config.prod ? config.folder + '/backoffice' : '')))
+    .pipe(config.prod ? babel() : util.noop())
+    .pipe(config.prod ? concat('preserver.min.js') : util.noop())
+    .pipe(config.prod ? uglify() : util.noop())
+    .pipe(gulp.dest(urls.dest + (config.prod ? config.folder + '/backoffice' : '')))
 );
 
 gulp.task('manifest', () =>
     gulp.src(config.prod ? urls.prodManifest : urls.devManifest)
-        .pipe(rename('package.manifest'))
-        .pipe(gulp.dest(urls.dest + config.folder))
+    .pipe(rename('package.manifest'))
+    .pipe(gulp.dest(urls.dest + config.folder))
 );
 
-gulp.task('html', () => 
+gulp.task('html', () =>
     gulp.src(urls.html)
-        .pipe(gulp.dest(urls.dest))
+    .pipe(gulp.dest(urls.dest))
 );
 
-gulp.task('css', () => 
+gulp.task('lang', () =>
+    gulp.src(urls.lang)
+    .pipe(gulp.dest(urls.dest))
+);
+
+gulp.task('css', () =>
     gulp.src(urls.css)
-        .pipe(gulp.dest(urls.dest))
+    .pipe(gulp.dest(urls.dest))
 );
 
 gulp.task('export', done => {
@@ -74,7 +80,7 @@ gulp.task('export', done => {
 
 //  gulp watch --dest '../path/to/app_plugins'
 gulp.task('watch', () => {
-    gulp.watch([urls.js, urls.html, urls.css, urls.devManifest], gulp.series('default'));
-}); 
+    gulp.watch([urls.js, urls.html, urls.css, urls.lang, urls.devManifest], gulp.series('default'));
+});
 
-gulp.task('default', gulp.series('clean', 'js', 'html', 'css', 'manifest', 'export'));
+gulp.task('default', gulp.series('clean', 'js', 'html', 'css', 'lang', 'manifest', 'export'));

@@ -8,11 +8,11 @@
          *
          */
         const debounce = (callback, interval) => {
-            let timeout = null;
+            let timeout = null; 
 
             return () => {
-                $timeout.cancel(timeout);
-                timeout = $timeout(() => callback.apply(this, arguments), interval);
+                $timeout.cancel(timeout); 
+                timeout = $timeout(() => callback.apply(this, arguments), interval); 
             }
         };
 
@@ -22,7 +22,7 @@
          */
         const findAncestor = (el, cls) => {
             while ((el = el.parentElement) && !el.classList.contains(cls));
-            return el;
+            return el; 
         };
 
 
@@ -48,7 +48,7 @@
             }
         }
 
-
+ 
         /**
          *
          */
@@ -92,7 +92,7 @@
             propElm.style.display = 'none';
             if (!propElm.nextElementSibling) {
                 propElm.previousElementSibling.querySelector('.control-group').classList.add('p-last-child');
-            }
+            } 
         }
 
         const fromStore = localStorage.getItem(dataKey);
@@ -101,7 +101,7 @@
                 key: 'preserver_notice',
                 view: `${Umbraco.Sys.ServerVariables.umbracoSettings.appPluginsPath}/preserver/backoffice/notification.html`
             });
-        }
+        } 
 
 
         /** 
@@ -132,7 +132,7 @@
                         if (editorState.current.variants.some(x => x.isDirty)) {
                             localStorage.setItem(dataKey, getBasicModel(editorState.current));
                         }
-                    }, 1000), true);
+                    }, 300), true);
 
             } else {
                 watcher ? watcher() : angular.noop();
