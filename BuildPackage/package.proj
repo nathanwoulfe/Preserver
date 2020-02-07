@@ -18,7 +18,7 @@
 	<PropertyGroup>
 		<PackageName>Preserver</PackageName>
 		<MinUmbracoVersion>8.0.0</MinUmbracoVersion>
-		<Readme>A property editor auto-saving content</Readme>
+		<Readme>A property editor for rescuing content changes</Readme>
 		<AuthorName>Nathan Woulfe</AuthorName>
 		<AuthorUrl>https://github.com/nathanwoulfe</AuthorUrl>
 		<PackageLicenseName>MIT license</PackageLicenseName>
