@@ -1,20 +1,8 @@
 ﻿(() => {
 
-    function preserver($scope, $rootScope, $element, $timeout, editorState, notificationsService) {
+    function preserver($interval, $rootScope, $element, editorState, notificationsService) {
 
         const dataKey = `preserver_data_${editorState.current.id}`;
-
-        /**
-         *
-         */
-        const debounce = (callback, interval) => {
-            let timeout = null;
-
-            return () => {
-                $timeout.cancel(timeout);
-                timeout = $timeout(() => callback.apply(this, arguments), interval);
-            }
-        };
 
 
         /**
@@ -103,7 +91,7 @@
             });
         }
 
-
+        
         /** 
          *
          */
@@ -121,27 +109,18 @@
 
 
         /**
-         * watch for change to the editor state, with a debounce to avoid over-zealous tracking
+         * smash it into local storage every 10 seconds, if the node is dirty
          */
-        var watcher;
         if (editorState.current.variants) {
-            $scope.$watch(() => editorState.current.variants.some(x => x.isDirty), dirty => {
-
-                if (dirty) {
-                    watcher =
-                        $scope.$watch(() => editorState.current.variants, debounce(() => {
-                            if (editorState.current.variants.some(x => x.isDirty)) {
-                                localStorage.setItem(dataKey, getBasicModel(editorState.current));
-                            }
-                        }, 300), true);
-
-                } else {
-                    watcher ? watcher() : angular.noop();
+            $interval(() => {
+                if (editorState.current.variants.some(x => x.isDirty)) {
+                    localStorage.setItem(dataKey, getBasicModel(editorState.current));
                 }
-            });
+            }, 1e4);
         }
     }
 
-    angular.module('preserver').controller('preserver.editor.controller',
-                                 ['$scope', '$rootScope', '$element', '$timeout', 'editorState', 'notificationsService', preserver]);
+    angular.module('preserver')
+        .controller('preserver.editor.controller',
+            ['$interval', '$rootScope', '$element', 'editorState', 'notificationsService', preserver]);
 })();
