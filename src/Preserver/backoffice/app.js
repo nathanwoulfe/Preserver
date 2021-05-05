@@ -1,7 +1,15 @@
-(() => {
+import { EditorController } from './editor.controller';
+import { NotificationController } from './notification.controller';
 
-    angular.module('preserver', []);
-    angular.module('umbraco').requires.push('preserver');   
-    
-})();
- 
+const controllersModule = angular.module('preserver.controllers', [])
+    .controller(EditorController.name, EditorController)
+    .controller(NotificationController.name, NotificationController)
+    .name;
+
+const name = 'presever';
+
+angular.module(name, [
+    controllersModule
+]);
+
+angular.module('umbraco').requires.push(name);   

@@ -1,81 +1,29 @@
-﻿(() => {
+﻿export class EditorController {
 
-    function preserver($scope, $interval, $rootScope, $element, editorState, notificationsService) {
+    static name = 'Preserver.Editor.Controller';
 
-        const dataKey = `preserver_data_${editorState.current.id}`;
+    constructor($scope, $interval, $rootScope, $element, editorState, notificationsService) {
+        this.$scope = $scope;
+        this.$interval = $interval;
+        this.$rootScope = $rootScope;
+        this.$element = $element;
+        this.currentEditor = editorState.current;
+        this.notificationsService = notificationsService;
 
+        this.interval = null;
 
-        /**
-         *
-         */
-        const findAncestor = (el, cls) => {
-            while ((el = el.parentElement) && !el.classList.contains(cls));
-            return el;
-        };
+        this.dataKey = `preserver_data_${editorState.current.id}`;
+        this.nameKey = 'preserver';
+        this.notCreatedKey = 'NotCreated';
 
+        this.bindEvents();
+    }
 
-        /**
-         * map local values back onto model
-         */
-        const mapToEditorModel = model => {
-            for (let m of model) {
-                let editorVariant = editorState.current.variants.find(x => x.language.culture === m.variant);
-                if (editorVariant) {
-                    for (let t of m.tabs) {
-                        let editorTab = editorVariant.tabs.find(x => x.alias === t.alias);
-                        if (editorTab) {
-                            for (let p of t.properties) {
-                                let editorProp = editorTab.properties.find(x => x.alias === p.alias);
-                                if (editorProp) {
-                                    editorProp.value = p.value;
-                                }
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-
-        /**
-         *
-         */
-        const getBasicModel = current => {
-
-            let variants = current.variants;
-            let model = [];
-
-            for (let v of variants) {
-                if (v.state != 'NotCreated') {
-                    let variant = {
-                        variant: v.language.culture,
-                        tabs: []
-                    };
-
-                    for (let t of v.tabs) {
-                        variant.tabs.push({
-                            alias: t.alias,
-                            properties: t.properties.filter(x => x.editor != 'preserver').map(p => {
-                                return {
-                                    alias: p.alias, 
-                                    value: p.value
-                                }
-                            })
-                        });
-                    }
-
-                    model.push(variant);
-                }
-            }
-
-            return JSON.stringify(model);
-        };
-
- 
+    $onInit() {
         /**
          * hide the property editor
          */
-        const propElm = findAncestor($element[0], 'umb-property');
+        const propElm = this.findAncestor(this.$element[0], 'umb-property');
         if (propElm) {
             propElm.style.display = 'none';
             if (!propElm.nextElementSibling) {
@@ -83,21 +31,38 @@
             }
         }
 
-        const fromStore = localStorage.getItem(dataKey);
-        if (fromStore) {
-            notificationsService.add({
+        this.fromStore = localStorage.getItem(this.dataKey);        
+        if (this.fromStore) {
+            this.notificationsService.add({
                 key: 'preserver_notice',
                 view: `${Umbraco.Sys.ServerVariables.umbracoSettings.appPluginsPath}/preserver/backoffice/notification.html`
             });
         }
 
-        
+        /**
+         * smash it into local storage every 10 seconds, if the node is dirty
+         */
+        if (this.currentEditor.variants) {
+            this.interval = this.$interval(() => {
+                const current = this.currentEditor;
+                if (current.variants.some(x => x.isDirty)) {
+                    localStorage.setItem(this.dataKey, this.getBasicModel(current));
+                }
+            }, 1e4);
+        }
+    }
+
+    bindEvents = () => {
+        const preserverUpdateKey = 'preserver.update';
+        const contentSavedKey = 'content.saved';
+        const destroyKey = '$destroy';
+
         /** 
          *
          */
-        $rootScope.$on('preserver.update', (e, data) => {
-            if (data.id === editorState.current.id) {
-                mapToEditorModel(JSON.parse(fromStore));
+        const preserverUpdate = this.$rootScope.$on(preserverUpdateKey, (_, data) => {
+            if (data.id === this.currentEditor.id) {
+                this.mapToEditorModel(JSON.parse(this.fromStore));
             }
         });
 
@@ -105,34 +70,143 @@
         /**
          * listen for the content saved event, and remove local store data
          */
-        $rootScope.$on('content.saved', (e, data) => localStorage.removeItem(dataKey));
+        const contentSaved = this.$rootScope.$on(contentSavedKey, () => localStorage.removeItem(this.dataKey));
 
-        
+
         /**
          * make sure the interval is killed along with the controller - otherwise continues to fire when changing sections.
          */
-        $scope.$on('$destroy', () => {
-            if (angular.isDefined(interval)) {
-                $interval.cancel(interval);
-                interval = undefined;
+        this.$scope.$on(destroyKey, () => {
+            if (this.interval !== null) {
+                this.$interval.cancel(interval);
+                this.interval = undefined;
             }
-        });
-        
 
-        /**
-         * smash it into local storage every 10 seconds, if the node is dirty
-         */
-        let interval;
-        if (editorState.current.variants) {
-            interval = $interval(() => {
-                if (editorState.current.variants.some(x => x.isDirty)) {
-                    localStorage.setItem(dataKey, getBasicModel(editorState.current));
-                }
-            }, 1e4);
+            preserverUpdate();
+            contentSaved();
+        });
+    }
+
+
+    /**
+     *
+     */
+    findAncestor = (el, cls) => {
+        while ((el = el.parentElement) && el.localName !== cls);
+        return el;
+    };
+
+
+    /**
+     * map local values back onto model
+     */
+    mapToEditorModel = model => {
+        for (let m of model) {
+            let editorVariant = this.currentEditor.variants.find(x => x.language.culture === m.variant);
+            if (!editorVariant)
+                continue;
+
+            for (let t of m.tabs) {
+                this.updateVariant(t, editorVariant);
+            }
         }
     }
 
-    angular.module('preserver')
-        .controller('preserver.editor.controller',
-            ['$scope', '$interval', '$rootScope', '$element', 'editorState', 'notificationsService', preserver]);
-})();
+
+    /**
+     * 
+     * @param {*} tab 
+     * @param {*} variant 
+     */
+    updateVariant(tab, variant) {
+        let editorTab = variant.tabs.find(x => x.alias === tab.alias);
+        if (!editorTab)
+            return;
+
+        for (let p of tab.properties) {
+            let editorProp = editorTab.properties.find(x => x.alias === p.alias);
+            if (!editorProp)
+                continue;
+
+            const value = p.value;
+
+            // if it's a block, only assign content and layout
+            if (value && value.contentData) {
+                // how does block content sync back?
+                // TODO -> find editor on parent scope?
+                editorProp.value.contentData = value.contentData;
+                editorProp.value.settingsData = value.settingsData;
+                editorProp.value.layout[value.layout] = value.contentData.map(c => ({
+                  contentUdi: c.udi  
+                }));
+
+                editorProp.onValueChanged(editorProp.value);
+            } else {
+                editorProp.value = value;
+            }
+        }
+    }
+
+
+    /**
+     *
+     */
+    getBasicModel = current => {
+
+        const variants = current.variants;
+        let model = [];
+
+        for (let v of variants) {
+            if (v.state === this.notCreatedKey)
+                continue;
+
+            const variant = {
+                variant: v.language.culture,
+                tabs: []
+            };
+
+            for (let t of v.tabs) {
+                variant.tabs.push({
+                    alias: t.alias,
+                    properties: t.properties
+                        .filter(x => x.editor !== this.nameKey)
+                        .map(p => this.getPropertyValue(p))
+                });
+            }
+
+            model.push(variant);
+        }
+
+        return JSON.stringify(model);
+    };
+
+    /**
+     * 
+     * @param {*} property 
+     * @returns 
+     */
+    getPropertyValue = property => {
+        const alias = property.alias;
+        const value = property.value;
+
+        // must discard the layout data for blocklist
+        if (value &&
+            value.hasOwnProperty('settingsData') &&
+            value.hasOwnProperty('contentData') &&
+            value.hasOwnProperty('layout')) {
+            return {
+                alias,
+                value: {
+                    contentData: value.contentData,
+                    settingsData: value.settingsData,
+                    layout: property.editor,
+                }
+            }
+        }
+
+        return {
+            alias,
+            value
+        }
+    }
+}

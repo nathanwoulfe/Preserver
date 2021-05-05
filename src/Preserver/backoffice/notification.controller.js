@@ -1,16 +1,17 @@
-(() => {
+export class NotificationController {
 
-    function notificationController($rootScope, notificationsService, editorState) {
+    static name = 'Preserver.Notification.Controller';
 
-        this.update = n => {
-            $rootScope.$emit('preserver.update', { id: editorState.current.id });
-            this.discard(n);
-        };
-
-        this.discard = n => notificationsService.remove(n);
+    constructor($rootScope, notificationsService, editorState) {
+        this.$rootScope = $rootScope;
+        this.notificationsService = notificationsService;
+        this.editorState = editorState;
     }
 
-    // register controller 
-    angular.module('preserver').controller('preserver.notification.controller', ['$rootScope', 'notificationsService', 'editorState', notificationController]);
-})();
-  
+    update = n => {
+        this.$rootScope.$emit('preserver.update', { id: this.editorState.current.id });
+        this.discard(n);
+    };
+
+    discard = n => this.notificationsService.remove(n);
+}
