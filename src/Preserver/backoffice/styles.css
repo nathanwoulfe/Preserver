@@ -1,1 +1,8 @@
-.p-last-child::after { display:none!important; }
+.prsrvr-last-child {
+    margin-bottom:0!important;
+}
+.prsrvr-last-child::after { 
+    background-color: transparent;
+    margin:0;
+    height:0;
+ }

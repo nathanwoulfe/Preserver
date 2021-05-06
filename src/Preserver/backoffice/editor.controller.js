@@ -27,7 +27,7 @@
         if (propElm) {
             propElm.style.display = 'none';
             if (!propElm.nextElementSibling) {
-                propElm.previousElementSibling.querySelector('.control-group').classList.add('p-last-child');
+                propElm.previousElementSibling.querySelector('.control-group').classList.add('prsrvr-last-child');
             }
         }
 
@@ -102,7 +102,7 @@
      */
     mapToEditorModel = model => {
         for (let m of model) {
-            let editorVariant = this.currentEditor.variants.find(x => x.language.culture === m.variant);
+            let editorVariant = this.currentEditor.variants.find(x => !x.language || x.language.culture === m.variant);
             if (!editorVariant)
                 continue;
 
@@ -132,8 +132,6 @@
 
             // if it's a block, only assign content and layout
             if (value && value.contentData) {
-                // how does block content sync back?
-                // TODO -> find editor on parent scope?
                 editorProp.value.contentData = value.contentData;
                 editorProp.value.settingsData = value.settingsData;
                 editorProp.value.layout[value.layout] = value.contentData.map(c => ({
@@ -161,7 +159,7 @@
                 continue;
 
             const variant = {
-                variant: v.language.culture,
+                variant: v.language?.culture || 'invariant',
                 tabs: []
             };
 
