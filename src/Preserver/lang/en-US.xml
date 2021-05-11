@@ -1,8 +1,11 @@
 <?xml version="1.0" encoding="utf-8" standalone="yes"?>
 <language alias="en" intName="English (US)" localName="English (US)" lcid="" culture="en-US">
     <area alias="preserver">
-        <key alias="foundContentHeading">Preserver found unsaved content. Import it?</key>
-        <key alias="foundContent">Importing will update properties where the rescued content is different to the last saved content. Import?</key>
+        <key alias="foundContentHeading">Preserver found unsaved content</key>
+        <key alias="foundContent">
+            Importing will update properties where the rescued content is different to the last saved content, 
+            then will save the updated node and refresh the backoffice.
+        </key>
     </area>
 </language>
  

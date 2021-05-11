@@ -2,13 +2,18 @@
 
     static name = 'Preserver.Editor.Controller';
 
-    constructor($scope, $interval, $rootScope, $element, editorState, notificationsService) {
-        this.$scope = $scope;
+    constructor($scope, $interval, $timeout, $window, $element, editorState, localizationService, overlayService, contentResource, fileManager) {
         this.$interval = $interval;
-        this.$rootScope = $rootScope;
+        this.$timeout = $timeout;
         this.$element = $element;
+        this.$window = $window;
+        this.$scope = $scope;
+        this.fileManager = fileManager;
+
         this.currentEditor = editorState.current;
-        this.notificationsService = notificationsService;
+        this.overlayService = overlayService;
+        this.contentResource = contentResource;
+        this.localizationService = localizationService;
 
         this.interval = null;
 
@@ -16,7 +21,7 @@
         this.nameKey = 'preserver';
         this.notCreatedKey = 'NotCreated';
 
-        this.bindEvents();
+        this.blockListEditorAlias = 'Umbraco.BlockList';
     }
 
     $onInit() {
@@ -31,11 +36,24 @@
             }
         }
 
-        this.fromStore = localStorage.getItem(this.dataKey);        
+        this.fromStore = localStorage.getItem(this.dataKey);
         if (this.fromStore) {
-            this.notificationsService.add({
-                key: 'preserver_notice',
-                view: `${Umbraco.Sys.ServerVariables.umbracoSettings.appPluginsPath}/preserver/backoffice/notification.html`
+            const dialog = {
+                view: `${Umbraco.Sys.ServerVariables.umbracoSettings.appPluginsPath}/preserver/backoffice/notification.html`,
+                submitButtonLabelKey: "general_import",
+                nodeId: this.currentEditor.id,
+                submit: result => {
+                    this.onOverlaySubmit(result.nodeId);
+                    this.overlayService.close();
+                },
+                close: () => {
+                    this.overlayService.close();
+                }
+            };
+
+            this.localizationService.localize("preserver_foundContentHeading").then(value => {
+                dialog.title = value;
+                this.overlayService.open(dialog);
             });
         }
 
@@ -44,47 +62,49 @@
          */
         if (this.currentEditor.variants) {
             this.interval = this.$interval(() => {
-                const current = this.currentEditor;
-                if (current.variants.some(x => x.isDirty)) {
-                    localStorage.setItem(this.dataKey, this.getBasicModel(current));
+                console.log(this.currentEditor.variants);
+                if (this.currentEditor.variants.some(x => x.isDirty)) {
+                    localStorage.setItem(this.dataKey, this.getBasicModel());
                 }
             }, 1e4);
         }
     }
 
-    bindEvents = () => {
-        const preserverUpdateKey = 'preserver.update';
-        const contentSavedKey = 'content.saved';
-        const destroyKey = '$destroy';
 
-        /** 
-         *
-         */
-        const preserverUpdate = this.$rootScope.$on(preserverUpdateKey, (_, data) => {
-            if (data.id === this.currentEditor.id) {
-                this.mapToEditorModel(JSON.parse(this.fromStore));
-            }
-        });
+    /**
+     * 
+     */
+    $onDestroy = () => {
+        if (this.interval !== null) {
+            this.$interval.cancel(this.interval);
+            this.interval = undefined;
+        }
+    }
 
 
-        /**
-         * listen for the content saved event, and remove local store data
-         */
-        const contentSaved = this.$rootScope.$on(contentSavedKey, () => localStorage.removeItem(this.dataKey));
+    /**
+     * 
+     * @param {*} id 
+     */
+    onOverlaySubmit = id => {
+        if (id === this.currentEditor.id) {
+            this.mapToEditorModel();
 
-
-        /**
-         * make sure the interval is killed along with the controller - otherwise continues to fire when changing sections.
-         */
-        this.$scope.$on(destroyKey, () => {
-            if (this.interval !== null) {
-                this.$interval.cancel(interval);
-                this.interval = undefined;
+            // dear god, forgive me this hideousity
+            for (let openNc of document.querySelectorAll('.umb-nested-content__item--active .umb-nested-content__header-bar')) {
+                this.$timeout(() => openNc.click());
             }
 
-            preserverUpdate();
-            contentSaved();
-        });
+            const scope = this.getPageScope();
+            scope.page.buttonGroupState = 'busy';
+
+            this.contentResource.save(this.currentEditor, false, this.fileManager.getFiles(), false)
+                .then(() => {
+                    scope.page.buttonGroupState = 'init';
+                    localStorage.removeItem(this.dataKey);
+                    this.$window.location.reload(true);
+                });
+        }
     }
 
 
@@ -98,16 +118,28 @@
 
 
     /**
+     * 
+     */
+    getPageScope = () => {
+        let el = this.$scope;
+
+        while ((el = el.$parent) && !el.hasOwnProperty('page'));
+        return el;
+    }
+    
+    /**
      * map local values back onto model
      */
-    mapToEditorModel = model => {
+    mapToEditorModel = (noUpdate = false) => {
+        const model = JSON.parse(this.fromStore);
+
         for (let m of model) {
-            let editorVariant = this.currentEditor.variants.find(x => !x.language || x.language.culture === m.variant);
+            let editorVariant = this.getVariantByCulture(m.variant);
             if (!editorVariant)
                 continue;
 
             for (let t of m.tabs) {
-                this.updateVariant(t, editorVariant);
+                this.updateVariant(t, editorVariant, noUpdate);
             }
         }
     }
@@ -119,43 +151,52 @@
      * @param {*} variant 
      */
     updateVariant(tab, variant) {
-        let editorTab = variant.tabs.find(x => x.alias === tab.alias);
+        const editorTab = variant.tabs.find(x => x.alias === tab.alias);
+
         if (!editorTab)
             return;
 
+        variant.save = true;
+
         for (let p of tab.properties) {
-            let editorProp = editorTab.properties.find(x => x.alias === p.alias);
+            const alias = p.alias;
+            const value = p.value;
+
+            const editorProp = editorTab.properties.find(x => x.alias === alias);
+
             if (!editorProp)
                 continue;
 
-            const value = p.value;
-
             // if it's a block, only assign content and layout
-            if (value && value.contentData) {
+            if (p.editor === this.blockListEditorAlias) {
                 editorProp.value.contentData = value.contentData;
                 editorProp.value.settingsData = value.settingsData;
-                editorProp.value.layout[value.layout] = value.contentData.map(c => ({
-                  contentUdi: c.udi  
+                editorProp.value.layout[this.blockListEditorAlias] = value.contentData.map(c => ({
+                    contentUdi: c.udi
                 }));
 
-                editorProp.onValueChanged(editorProp.value);
+                //editorProp.onValueChanged(editorProp.value);
             } else {
                 editorProp.value = value;
-            }
+            }            
         }
     }
+
+
+    getVariantByCulture = culture =>
+        this.currentEditor.variants.find(x => !x.language || x.language.culture === culture);
 
 
     /**
      *
      */
-    getBasicModel = current => {
+    getBasicModel = () => {
 
-        const variants = current.variants;
+        const variants = this.currentEditor.variants;
         let model = [];
 
         for (let v of variants) {
-            if (v.state === this.notCreatedKey)
+            if (v.state === this.notCreatedKey || !v.isDirty)
                 continue;
 
             const variant = {
@@ -186,25 +227,27 @@
     getPropertyValue = property => {
         const alias = property.alias;
         const value = property.value;
+        const editor = property.editor;
+        const label = property.label;
 
         // must discard the layout data for blocklist
-        if (value &&
-            value.hasOwnProperty('settingsData') &&
-            value.hasOwnProperty('contentData') &&
-            value.hasOwnProperty('layout')) {
+        if (editor === this.blockListEditorAlias) {
             return {
                 alias,
+                editor,
+                label,
                 value: {
                     contentData: value.contentData,
                     settingsData: value.settingsData,
-                    layout: property.editor,
                 }
             }
         }
 
         return {
             alias,
-            value
+            editor,
+            label,
+            value,
         }
     }
 }
